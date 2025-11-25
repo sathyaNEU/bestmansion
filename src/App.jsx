@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Home, MapPin, Bed, Wifi, Droplets, Zap, Phone, Mail, Menu, X, Check, Shield, Coffee, Wind, Bike } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, MapPin, Droplets, Zap, Phone, Menu, X, Check, Shield, Coffee, Wind, Bike } from 'lucide-react';
 
 export default function BestMansion() {
   const [scrollY, setScrollY] = useState(0);
@@ -162,7 +162,7 @@ export default function BestMansion() {
         >
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black z-10" />
           <img
-            src="/images/image1.jpg"
+            src="./images/image1.jpg"
             alt="Best Mansion"
             className="w-full h-full object-cover scale-110 opacity-60"
           />
@@ -267,15 +267,15 @@ export default function BestMansion() {
                   className="space-y-4"
                   style={{ transform: `translateY(${-scrollY * 0.05}px)` }}
                 >
-                  <img src="/images/image2.jpg" alt="Management" className="rounded-2xl shadow-2xl" />
-                  <img src="/images/image8.jpg" alt="Amenities" className="rounded-2xl shadow-2xl" />
+                  <img src="./images/image2.jpg" alt="Management" className="rounded-2xl shadow-2xl" />
+                  <img src="./images/image8.jpg" alt="Amenities" className="rounded-2xl shadow-2xl" />
                 </div>
                 <div 
                   className="space-y-4 pt-12"
                   style={{ transform: `translateY(${-scrollY * 0.03}px)` }}
                 >
-                  <img src="/images/image3.jpg" alt="Rooms" className="rounded-2xl shadow-2xl" />
-                  <img src="/images/image6.jpg" alt="Comfort" className="rounded-2xl shadow-2xl" />
+                  <img src="./images/image3.jpg" alt="Rooms" className="rounded-2xl shadow-2xl" />
+                  <img src="./images/image6.jpg" alt="Comfort" className="rounded-2xl shadow-2xl" />
                 </div>
               </div>
             </div>
@@ -356,10 +356,10 @@ export default function BestMansion() {
 
           <div className="grid md:grid-cols-4 gap-6 mb-20">
             {[
-              { icon: Zap, title: 'Generator Backup', img: '/images/image4.jpg' },
-              { icon: Droplets, title: 'Hot Water 24/7', img: '/images/image7.jpg' },
-              { icon: Bike, title: 'Parking', img: '/images/image9.jpg' },
-              { icon: Wind, title: 'RO Water', img: '/images/image8.jpg' }
+              { icon: Zap, title: 'Generator Backup', img: './images/image4.jpg' },
+              { icon: Droplets, title: 'Hot Water 24/7', img: './images/image7.jpg' },
+              { icon: Bike, title: 'Parking', img: './images/image9.jpg' },
+              { icon: Wind, title: 'RO Water', img: './images/image8.jpg' }
             ].map((feature, idx) => (
               <div 
                 key={idx}
@@ -417,12 +417,12 @@ export default function BestMansion() {
 
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              { src: '/images/image1.jpg', title: 'Exterior', span: 'md:col-span-2', style: { aspectRatio: '630/297' } },
-              { src: '/images/image3.jpg', title: 'Rooms' },
-              { src: '/images/image6.jpg', title: 'Comfort' },
-              { src: '/images/image7.jpg', title: 'Hot Water' },
-              { src: '/images/image8.jpg', title: 'RO Water' },
-              { src: '/images/image4.jpg', title: 'Power Backup' }
+              { src: './images/image1.jpg', title: 'Exterior', span: 'md:col-span-2', style: { aspectRatio: '630/297' } },
+              { src: './images/image3.jpg', title: 'Rooms' },
+              { src: './images/image6.jpg', title: 'Comfort' },
+              { src: './images/image7.jpg', title: 'Hot Water' },
+              { src: './images/image8.jpg', title: 'RO Water' },
+              { src: './images/image4.jpg', title: 'Power Backup' }
             ].map((img, idx) => (
               <div
                 key={idx}
