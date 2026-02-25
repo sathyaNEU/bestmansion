@@ -2,6 +2,7 @@
   "name": "best-mansion-website",
   "version": "1.0.0",
   "private": true,
+  "homepage": "https://sathyaneu.github.io/bestmansion",
   "dependencies": {
     "gh-pages": "^6.3.0",
     "lucide-react": "^0.263.1",
