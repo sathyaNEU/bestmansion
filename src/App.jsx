@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Home, MapPin, Droplets, Zap, Phone, Menu, X, Check, Shield, Coffee, Wind, Bike, Wifi } from 'lucide-react';
 
-const BASE = '';
+const BASE = import.meta.env.BASE_URL;
 
 function FloatingBubbles() {
   const canvasRef = useRef(null);
@@ -225,7 +225,7 @@ export default function BestMansion() {
             </div>
             <div className="relative">
               <div className="rounded-3xl overflow-hidden" style={{ width:'100%', aspectRatio:'630/315' }}>
-                <img src={`${BASE}/images/image1.jpg`} alt="Best Mansion Arumbakkam Chennai — Exterior View"
+                <img src={`${BASE}images/image1.jpg`} alt="Best Mansion Arumbakkam Chennai — Exterior View"
                   className="w-full h-full object-cover object-center" loading="eager" />
               </div>
               <div className="absolute -bottom-6 -left-6 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-2xl p-6">
@@ -313,10 +313,10 @@ export default function BestMansion() {
           </div>
           <div className="grid md:grid-cols-4 gap-6 mb-20">
             {[
-              { icon: Zap,      title:'Generator Backup',    img:`${BASE}/images/image4.jpg` },
-              { icon: Droplets, title:'Hot Water 24/7',      img:`${BASE}/images/image7.jpg` },
-              { icon: Bike,     title:'Two-Wheeler Parking', img:`${BASE}/images/image9.jpg` },
-              { icon: Wind,     title:'RO Drinking Water',   img:`${BASE}/images/image8.jpg` },
+              { icon: Zap,      title:'Generator Backup',    img:`${BASE}images/image4.jpg` },
+              { icon: Droplets, title:'Hot Water 24/7',      img:`${BASE}images/image7.jpg` },
+              { icon: Bike,     title:'Two-Wheeler Parking', img:`${BASE}images/image9.jpg` },
+              { icon: Wind,     title:'RO Drinking Water',   img:`${BASE}images/image8.jpg` },
             ].map((feature, idx) => (
               <div key={idx} className="group relative aspect-square rounded-3xl overflow-hidden cursor-pointer">
                 <img src={feature.img} alt={`${feature.title} — Best Mansion PG Chennai`}
@@ -363,12 +363,12 @@ export default function BestMansion() {
           </div>
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              { src:`${BASE}/images/image1.jpg`, title:'Exterior — Best Mansion Arumbakkam', span:'md:col-span-2', style:{ aspectRatio:'630/297' } },
-              { src:`${BASE}/images/image3.jpg`, title:'Sharing Rooms — PG Chennai' },
-              { src:`${BASE}/images/image6.jpg`, title:'Comfortable PG Accommodation' },
-              { src:`${BASE}/images/image7.jpg`, title:'24/7 Hot Water' },
-              { src:`${BASE}/images/image8.jpg`, title:'RO Drinking Water' },
-              { src:`${BASE}/images/image4.jpg`, title:'Generator — Uninterrupted Power' },
+              { src:`${BASE}images/image1.jpg`, title:'Exterior — Best Mansion Arumbakkam', span:'md:col-span-2', style:{ aspectRatio:'630/297' } },
+              { src:`${BASE}images/image3.jpg`, title:'Sharing Rooms — PG Chennai' },
+              { src:`${BASE}images/image6.jpg`, title:'Comfortable PG Accommodation' },
+              { src:`${BASE}images/image7.jpg`, title:'24/7 Hot Water' },
+              { src:`${BASE}images/image8.jpg`, title:'RO Drinking Water' },
+              { src:`${BASE}images/image4.jpg`, title:'Generator — Uninterrupted Power' },
             ].map((img, idx) => (
               <div key={idx} className={`group relative overflow-hidden rounded-2xl ${img.span||'aspect-square'} cursor-pointer`} style={img.style}>
                 <img src={img.src} alt={img.title}
