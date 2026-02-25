@@ -1,5 +1,135 @@
-import React, { useState, useEffect } from 'react';
-import { Home, MapPin, Droplets, Zap, Phone, Menu, X, Check, Shield, Coffee, Wind, Bike } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Home, MapPin, Droplets, Zap, Phone, Menu, X, Check, Shield, Coffee, Wind, Bike, Wifi } from 'lucide-react';
+
+const BASE = '';
+
+// ── Cursor-following Bubbles ──
+function FloatingBubbles() {
+  const canvasRef = useRef(null);
+  const mouseRef = useRef({ x: -999, y: -999 });
+  const bubblesRef = useRef([]);
+  const animRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const handleMouseMove = e => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+    canvas.parentElement.addEventListener('mousemove', handleMouseMove);
+
+    // Create fewer, rounder-but-slightly-oval bubbles
+    const NUM = 14;
+    bubblesRef.current = Array.from({ length: NUM }, () => {
+      const r = 22 + Math.random() * 40;
+      return {
+        x: Math.random() * (canvas.width || 800),
+        y: Math.random() * (canvas.height || 600),
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: -0.3 - Math.random() * 0.4,
+        r,
+        ry: r * (0.75 + Math.random() * 0.2), // slightly squished → oval/egg
+        opacity: 0.07 + Math.random() * 0.12,
+        hue: Math.random() < 0.65 ? 270 : 320,
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.006 + Math.random() * 0.01,
+        wobbleAmp: 0.06 + Math.random() * 0.08, // squeeze wobble
+      };
+    });
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const mouse = mouseRef.current;
+
+      bubblesRef.current.forEach(b => {
+        // Drift toward cursor softly
+        const dx = mouse.x - b.x;
+        const dy = mouse.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const strength = Math.min(80 / dist, 0.15);
+        b.vx += dx / dist * strength * 0.012;
+        b.vy += dy / dist * strength * 0.012;
+
+        // Base upward drift
+        b.vy -= 0.008;
+
+        // Dampen
+        b.vx *= 0.97;
+        b.vy *= 0.97;
+
+        b.x += b.vx;
+        b.y += b.vy;
+        b.wobble += b.wobbleSpeed;
+
+        // Wrap around edges
+        if (b.x < -b.r) b.x = canvas.width + b.r;
+        if (b.x > canvas.width + b.r) b.x = -b.r;
+        if (b.y < -b.r * 2) { b.y = canvas.height + b.r; b.x = Math.random() * canvas.width; }
+        if (b.y > canvas.height + b.r * 2) b.y = -b.r;
+
+        // Dynamic oval: squish slightly on wobble
+        const currentRy = b.ry * (1 + Math.sin(b.wobble) * b.wobbleAmp);
+        const currentRx = b.r * (1 - Math.sin(b.wobble) * b.wobbleAmp * 0.5);
+
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(1, currentRy / currentRx);
+
+        // Gradient fill
+        const grad = ctx.createRadialGradient(-currentRx * 0.25, -currentRy * 0.25, currentRx * 0.05, 0, 0, currentRx);
+        grad.addColorStop(0, `hsla(${b.hue}, 70%, 80%, ${b.opacity * 1.8})`);
+        grad.addColorStop(0.55, `hsla(${b.hue}, 60%, 55%, ${b.opacity})`);
+        grad.addColorStop(1, `hsla(${b.hue}, 50%, 35%, 0)`);
+
+        ctx.beginPath();
+        ctx.arc(0, 0, currentRx, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Rim
+        ctx.beginPath();
+        ctx.arc(0, 0, currentRx, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${b.hue}, 75%, 80%, ${b.opacity})`;
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+
+        // Glint
+        ctx.beginPath();
+        ctx.arc(-currentRx * 0.28, -currentRx * 0.28, currentRx * 0.16, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${b.opacity * 2.2})`;
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener('resize', resize);
+      canvas.parentElement?.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{ zIndex: 1 }}
+    />
+  );
+}
 
 export default function BestMansion() {
   const [scrollY, setScrollY] = useState(0);
@@ -14,362 +144,282 @@ export default function BestMansion() {
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
-      
       const sections = ['home', 'experience', 'location', 'features', 'gallery', 'contact'];
-      const current = sections.find(section => {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          return rect.top <= 150 && rect.bottom >= 150;
-        }
+      const cur = sections.find(s => {
+        const el = document.getElementById(s);
+        if (el) { const r = el.getBoundingClientRect(); return r.top <= 150 && r.bottom >= 150; }
         return false;
       });
-      if (current) setActiveSection(current);
+      if (cur) setActiveSection(cur);
     };
-
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-
+    const handleMouseMove = e => setMousePosition({ x: e.clientX, y: e.clientY });
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
+    return () => { window.removeEventListener('scroll', handleScroll); window.removeEventListener('mousemove', handleMouseMove); };
   }, []);
 
   useEffect(() => {
-    const typingSpeed = isDeleting ? 80 : 150;
-    const pauseBeforeDelete = 2000;
-
     const timer = setTimeout(() => {
-      const currentWord = words[wordIndex];
-      
-      if (!isDeleting && typedWord === currentWord) {
-        setTimeout(() => setIsDeleting(true), pauseBeforeDelete);
-      } else if (isDeleting && typedWord === '') {
-        setIsDeleting(false);
-        setWordIndex((prev) => (prev + 1) % words.length);
-      } else {
-        setTypedWord(
-          isDeleting
-            ? currentWord.substring(0, typedWord.length - 1)
-            : currentWord.substring(0, typedWord.length + 1)
-        );
-      }
-    }, typingSpeed);
-
+      const cur = words[wordIndex];
+      if (!isDeleting && typedWord === cur) { setTimeout(() => setIsDeleting(true), 2000); }
+      else if (isDeleting && typedWord === '') { setIsDeleting(false); setWordIndex(p => (p + 1) % words.length); }
+      else { setTypedWord(isDeleting ? cur.substring(0, typedWord.length - 1) : cur.substring(0, typedWord.length + 1)); }
+    }, isDeleting ? 80 : 150);
     return () => clearTimeout(timer);
   }, [typedWord, isDeleting, wordIndex]);
 
-  const scrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setMobileMenuOpen(false);
-    }
+  const scrollToSection = id => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setMobileMenuOpen(false);
   };
 
   const parallaxOffset = scrollY * 0.5;
   const headerOpacity = Math.min(scrollY / 100, 1);
 
   return (
-    <div className="bg-black text-white overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white overflow-x-hidden">
+
       {/* Ambient Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div 
-          className="absolute w-96 h-96 bg-purple-600 rounded-full filter blur-3xl opacity-20"
-          style={{
-            left: mousePosition.x - 192,
-            top: mousePosition.y - 192,
-            transition: 'all 0.3s ease-out'
-          }}
-        />
-        <div className="absolute top-20 right-20 w-96 h-96 bg-blue-600 rounded-full filter blur-3xl opacity-10 animate-pulse" />
-        <div className="absolute bottom-20 left-20 w-96 h-96 bg-pink-600 rounded-full filter blur-3xl opacity-10 animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+        <div className="absolute w-96 h-96 rounded-full opacity-20 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #7c3aed, transparent)', left: mousePosition.x - 192, top: mousePosition.y - 192, transition: 'left 0.3s ease, top 0.3s ease' }} />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-900 rounded-full opacity-10 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-900 rounded-full opacity-10 blur-3xl" />
       </div>
 
       {/* Header */}
-      <header 
-        className="fixed w-full z-50 transition-all duration-500"
-        style={{
-          backgroundColor: `rgba(0, 0, 0, ${headerOpacity * 0.9})`,
-          backdropFilter: scrollY > 50 ? 'blur(20px)' : 'none'
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3 group cursor-pointer">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-75 group-hover:opacity-100 transition-opacity" />
-                <div className="relative w-11 h-11 bg-black rounded-xl flex items-center justify-center border border-gray-800">
-                  <Home className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight">Best Mansion</h1>
-                <p className="text-xs text-gray-400">Chennai</p>
-              </div>
+      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 transition-all duration-300"
+        style={{ backgroundColor: `rgba(0,0,0,${headerOpacity * 0.8})`, backdropFilter: scrollY > 50 ? 'blur(20px)' : 'none' }}>
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <Home className="w-4 h-4" />
             </div>
-
-            {/* Desktop Nav */}
-            <nav className="hidden md:flex space-x-1">
-              {['Home', 'Experience', 'Location', 'Features', 'Gallery', 'Contact'].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => scrollToSection(item.toLowerCase())}
-                  className={`px-4 py-2 text-sm rounded-lg transition-all ${
-                    activeSection === item.toLowerCase()
-                      ? 'bg-white bg-opacity-10 text-white'
-                      : 'text-gray-400 hover:text-white hover:bg-white hover:bg-opacity-5'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </nav>
-
-            <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X /> : <Menu />}
-            </button>
+            <div>
+              <div className="font-bold text-sm">Best Mansion</div>
+              <div className="text-xs text-gray-400">Arumbakkam, Chennai</div>
+            </div>
           </div>
+          <nav className="hidden md:flex items-center space-x-1">
+            {['Home', 'Experience', 'Location', 'Features', 'Gallery', 'Contact'].map(item => (
+              <button key={item} onClick={() => scrollToSection(item.toLowerCase())}
+                className={`px-4 py-2 text-sm rounded-lg transition-all ${activeSection === item.toLowerCase() ? 'bg-white bg-opacity-10 text-white' : 'text-gray-400 hover:text-white hover:bg-white hover:bg-opacity-5'}`}>
+                {item}
+              </button>
+            ))}
+          </nav>
+          <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
-
-        {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-black bg-opacity-95 backdrop-blur-xl border-t border-gray-800">
-            <nav className="flex flex-col p-6 space-y-2">
-              {['Home', 'Experience', 'Location', 'Features', 'Gallery', 'Contact'].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => scrollToSection(item.toLowerCase())}
-                  className="text-left py-3 px-4 text-gray-300 hover:text-white hover:bg-white hover:bg-opacity-5 rounded-lg transition-all"
-                >
+          <div className="md:hidden mt-4 pb-4 border-t border-white border-opacity-10">
+            <div className="flex flex-col space-y-1 pt-4">
+              {['Home', 'Experience', 'Location', 'Features', 'Gallery', 'Contact'].map(item => (
+                <button key={item} onClick={() => scrollToSection(item.toLowerCase())}
+                  className="text-left py-3 px-4 text-gray-300 hover:text-white hover:bg-white hover:bg-opacity-5 rounded-lg transition-all">
                   {item}
                 </button>
               ))}
-            </nav>
+            </div>
           </div>
         )}
       </header>
 
-      {/* Hero Section */}
+      {/* ── HERO ── */}
       <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div 
-          className="absolute inset-0 z-0"
-          style={{ transform: `translateY(${parallaxOffset}px)` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-black z-10" />
-          <img
-            src="./images/image1.jpg"
-            alt="Best Mansion"
-            className="w-full h-full object-cover scale-110 opacity-60"
-          />
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-purple-950"
+          style={{ transform: `translateY(${parallaxOffset}px)` }} />
 
-        <div className="relative z-20 text-center px-6 max-w-5xl mx-auto">
-          <div 
-            className="space-y-8"
-            style={{
-              transform: `translateY(${scrollY * 0.3}px)`,
-              opacity: 1 - scrollY / 500
-            }}
-          >
-            <div className="inline-block">
-              <div className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-full text-sm mb-6">
-                Hassle-free Living in Chennai
-              </div>
-            </div>
-            
-            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-none">
-              Redefining
-              <br />
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                {typedWord}
-              </span>
-              <br />
-              <span className="text-white">Living</span>
-            </h1>
-            
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto font-light">
-              Experience affordable accommodation where comfort meets sophistication
-            </p>
+        {/* Bubbles — no decorative rings */}
+        <FloatingBubbles />
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
-              <button
-                onClick={() => scrollToSection('contact')}
-                className="group relative px-8 py-4 bg-white text-black rounded-full font-medium overflow-hidden transition-all hover:scale-105"
-              >
-                <span className="relative z-10">Reserve Your Space</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-              <button
-                onClick={() => scrollToSection('experience')}
-                className="px-8 py-4 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-full font-medium hover:bg-opacity-20 transition-all"
-              >
-                Explore More
-              </button>
+        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto pt-24">
+          <div className="inline-flex items-center space-x-2 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-full px-6 py-2 mb-4 text-sm text-gray-300">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            <span>Best PG &amp; Paying Guest Accommodation in Chennai</span>
+          </div>
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-600/30 to-pink-600/30 backdrop-blur-xl border border-purple-400 border-opacity-40 rounded-full px-5 py-2 text-sm font-semibold text-purple-200">
+              <Wifi className="w-4 h-4 text-purple-300" />
+              <span>Free High-Speed WiFi Included</span>
             </div>
+          </div>
+          <h1 className="text-6xl md:text-8xl font-bold tracking-tight leading-none mb-6">
+            <span className="block text-white">Redefining</span>
+            <span className="block bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent min-h-[1.2em]">
+              {typedWord}<span className="animate-pulse">|</span>
+            </span>
+            <span className="block text-white">PG Living</span>
+          </h1>
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-4">
+            Affordable <strong className="text-white">Paying Guest accommodation for men</strong> in{' '}
+            <strong className="text-white">Arumbakkam, Chennai</strong> — near Koyambedu CMBT, Anna Nagar &amp; Vadapalani.
+          </p>
+          <p className="text-gray-500 max-w-2xl mx-auto mb-12 text-sm">
+            Free WiFi · AC &amp; Non-AC rooms · 24/7 hot water · Generator backup · Starting ₹3,600/month
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <button onClick={() => scrollToSection('contact')}
+              className="group relative px-8 py-4 bg-white text-black rounded-full font-medium overflow-hidden transition-all hover:scale-105">
+              <span className="relative z-10">Reserve Your Space</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 opacity-0 group-hover:opacity-20 transition-opacity" />
+            </button>
+            <button onClick={() => scrollToSection('experience')}
+              className="px-8 py-4 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-full font-medium hover:bg-opacity-20 transition-all">
+              Explore More
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Experience Section */}
+      {/* ── EXPERIENCE ── */}
       <section id="experience" className="relative py-32 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-20 items-center">
+          <div className="text-center mb-20">
+            <div className="text-sm text-gray-400 tracking-widest uppercase mb-4">The Experience</div>
+            <h2 className="text-5xl md:text-6xl font-bold tracking-tight">
+              Where Every Detail
+              <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Matters</span>
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-16 items-center mb-32">
             <div className="space-y-8">
-              <div className="space-y-4">
-                <div className="text-sm text-gray-400 tracking-widest uppercase">The Experience</div>
-                <h2 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-                  Where Every Detail
-                  <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    Matters
-                  </span>
-                </h2>
-              </div>
-              
-              <p className="text-xl text-gray-400 leading-relaxed">
-                Step into a world where premium amenities meet thoughtful design. 
-                Best Mansion isn't just accommodation—it's a lifestyle curated for those who demand excellence.
+              <p className="text-xl text-gray-300 leading-relaxed">
+                Are you planning to or just landed in Chennai, looking for the best{' '}
+                <strong className="text-white">sharing room or PG accommodation</strong> near Anna Nagar,
+                Arumbakkam, Aminjikarai, Vadapalani or Koyambedu? Best Mansion is the right choice.
+                Exclusively for men, we're strategically located just minutes from{' '}
+                <strong className="text-white">Koyambedu Main Bus Terminal (CMBT)</strong>.
               </p>
-
-              <div className="space-y-6 pt-8">
+              <p className="text-gray-400 leading-relaxed">
+                Whether you are working, studying, or on a temporary business trip to Chennai, Best Mansion
+                provides clean, peaceful <em>paying guest accommodation</em> that feels like home — because you
+                deserve comfort after a hard day's work.
+              </p>
+              <div className="space-y-6">
                 {[
-                  { icon: Shield, title: '24/7 Security', desc: 'Your safety is our priority' },
-                  { icon: Zap, title: 'Uninterrupted Power', desc: 'Never worry about outages' },
-                  { icon: Coffee, title: 'Community Spaces', desc: 'Connect and unwind' }
+                  { icon: Wifi,   title: 'Free High-Speed WiFi', desc: 'Stay connected — complimentary internet included' },
+                  { icon: Shield, title: '24/7 Security',        desc: 'Your safety is our top priority' },
+                  { icon: Zap,    title: 'Generator Backup',     desc: 'Uninterrupted power — never worry about outages' },
+                  { icon: Coffee, title: 'Community & Common TV Hall', desc: 'Connect, relax and unwind' },
                 ].map((item, idx) => (
-                  <div 
-                    key={idx}
-                    className="flex items-start space-x-4 group cursor-pointer"
-                  >
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg blur opacity-50 group-hover:opacity-100 transition-opacity" />
-                      <div className="relative w-12 h-12 bg-black border border-gray-800 rounded-lg flex items-center justify-center group-hover:border-pink-500 transition-colors">
-                        <item.icon className="w-6 h-6" />
-                      </div>
+                  <div key={idx} className="flex items-center space-x-4 group">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                      <item.icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg mb-1">{item.title}</h3>
-                      <p className="text-gray-400">{item.desc}</p>
+                      <div className="font-semibold">{item.title}</div>
+                      <div className="text-gray-400 text-sm">{item.desc}</div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* ── Building image — fixed 630×297, object-fit cover to show full building ── */}
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl blur-2xl opacity-20" />
-              <div className="relative grid grid-cols-2 gap-4">
-                <div 
-                  className="space-y-4"
-                  style={{ transform: `translateY(${-scrollY * 0.05}px)` }}
-                >
-                  <img src="./images/image2.jpg" alt="Management" className="rounded-2xl shadow-2xl" />
-                  <img src="./images/image8.jpg" alt="Amenities" className="rounded-2xl shadow-2xl" />
-                </div>
-                <div 
-                  className="space-y-4 pt-12"
-                  style={{ transform: `translateY(${-scrollY * 0.03}px)` }}
-                >
-                  <img src="./images/image3.jpg" alt="Rooms" className="rounded-2xl shadow-2xl" />
-                  <img src="./images/image6.jpg" alt="Comfort" className="rounded-2xl shadow-2xl" />
-                </div>
+              <div className="rounded-3xl overflow-hidden" style={{ width: '100%', aspectRatio: '630/315' }}>
+                <img
+                  src={`${BASE}/images/image1.jpg`}
+                  alt="Best Mansion Arumbakkam Chennai — Exterior View"
+                  className="w-full h-full object-cover object-center"
+                  loading="eager"
+                />
+              </div>
+              {/* Price badge */}
+              <div className="absolute -bottom-6 -left-6 bg-white bg-opacity-10 backdrop-blur-xl border border-white border-opacity-20 rounded-2xl p-6">
+                <div className="text-3xl font-bold">₹3,600</div>
+                <div className="text-gray-400 text-sm">Starting per month</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Location Section */}
+      {/* ── LOCATION ── */}
       <section id="location" className="relative py-32 px-6 bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <div className="text-sm text-gray-400 tracking-widest uppercase mb-4">Location</div>
-            <h2 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+            <h2 className="text-5xl md:text-6xl font-bold tracking-tight">
               At The Heart Of
-              <span className="block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Everything
-              </span>
+              <span className="block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Chennai</span>
             </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Strategically positioned for seamless connectivity to Chennai's prime destinations
-            </p>
+            <address className="not-italic text-gray-400 mt-4 max-w-xl mx-auto">
+              <strong>Best Mansion</strong> — 21-A, Anna Avenue, Arumbakkam, Chennai – 600 106.<br />
+              Strategically positioned for seamless connectivity to Anna Nagar, Koyambedu, Vadapalani &amp; Aminjikarai.
+            </address>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { title: 'VR Mall', time: '10 mins', desc: 'Shopping & Entertainment' },
-              { title: 'AMPA Skywalk', time: '5 mins', desc: '7 Screen Multiplex' },
-              { title: 'Koyambedu CMBT', time: '5 mins', desc: 'Major Transit Hub' },
-              { title: 'Anna Nagar', time: '8 mins', desc: 'Business District' },
+              { title: 'AMPA Skywalk (7-Screen Multiplex)', time: '5 mins', desc: 'Entertainment Hub' },
+              { title: 'Koyambedu CMBT Bus Stand', time: '5 mins', desc: 'Major Transit Hub' },
+              { title: 'Anna Nagar', time: '8 mins', desc: 'Business & Residential District' },
               { title: 'Vadapalani', time: '10 mins', desc: 'Commercial Center' },
-              { title: 'Metro Station', time: '7 mins', desc: 'Rapid Transit' }
-            ].map((location, idx) => (
-              <div 
-                key={idx}
-                className="group relative bg-white bg-opacity-5 backdrop-blur-xl border border-white border-opacity-10 rounded-2xl p-8 hover:bg-opacity-10 transition-all cursor-pointer overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-pink-600 opacity-0 group-hover:opacity-10 transition-opacity" />
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-2xl font-bold">{location.title}</h3>
-                    <MapPin className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-                    {location.time}
-                  </div>
-                  <p className="text-gray-400">{location.desc}</p>
+              { title: 'Koyambedu Metro Station', time: '7 mins', desc: 'Rapid Transit' },
+            ].map((loc, idx) => (
+              <div key={idx} className="group relative bg-white bg-opacity-5 backdrop-blur-xl border border-white border-opacity-10 rounded-2xl p-6 hover:bg-opacity-10 transition-all hover:-translate-y-1">
+                <div className="flex items-start justify-between mb-4">
+                  <MapPin className="w-5 h-5 text-purple-400" />
+                  <span className="text-sm font-semibold text-purple-400 bg-purple-400 bg-opacity-10 px-3 py-1 rounded-full">{loc.time}</span>
                 </div>
+                <h3 className="text-xl font-bold mb-1">{loc.title}</h3>
+                <p className="text-gray-400 text-sm">{loc.desc}</p>
               </div>
             ))}
           </div>
-
-          <div className="relative rounded-3xl overflow-hidden border border-white border-opacity-10">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 opacity-20 z-10" />
+          <div className="mt-16 rounded-3xl overflow-hidden border border-white border-opacity-10" style={{ height: 320 }}>
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3886.416256100027!2d80.2116927!3d13.0727848!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a5266a1d126f4d5%3A0xdfa41b46176f657d!2sBEST%20MANSION%20CHENNAI!5e0!3m2!1sen!2sus!4v1717733648975!5m2!1sen!2sus"
-              width="100%"
-              height="500"
-              style={{ border: 0 }}
-              allowFullScreen=""
-              loading="lazy"
+              title="Best Mansion Location — Arumbakkam, Chennai"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3886.4!2d80.2104!3d13.0742!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a5260e8d4a7c4b1%3A0x0!2sBest+Mansion%2C+Anna+Ave%2C+Arumbakkam%2C+Chennai!5e0!3m2!1sen!2sin!4v1"
+              width="100%" height="100%"
+              style={{ border: 0, filter: 'grayscale(60%) invert(90%)' }}
+              allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* ── FEATURES ── */}
       <section id="features" className="relative py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <div className="text-sm text-gray-400 tracking-widest uppercase mb-4">Features</div>
+            <div className="text-sm text-gray-400 tracking-widest uppercase mb-4">Features &amp; Amenities</div>
             <h2 className="text-5xl md:text-6xl font-bold tracking-tight">
               Built For
-              <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Excellence
-              </span>
+              <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Excellence</span>
             </h2>
+            <p className="text-gray-400 mt-4 max-w-xl mx-auto">
+              Best PG amenities in Arumbakkam, Chennai — free WiFi, AC rooms, hot water &amp; more.
+            </p>
           </div>
-
+          <div className="mb-12 rounded-3xl bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center space-x-5">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                <Wifi className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">Free High-Speed WiFi</h3>
+                <p className="text-gray-300 mt-1">Complimentary internet access throughout Best Mansion — perfect for remote work, streaming &amp; staying connected.</p>
+              </div>
+            </div>
+            <div className="flex-shrink-0 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-2xl px-6 py-3 text-center">
+              <div className="text-2xl font-bold text-green-400">FREE</div>
+              <div className="text-xs text-gray-400">No extra charge</div>
+            </div>
+          </div>
           <div className="grid md:grid-cols-4 gap-6 mb-20">
             {[
-              { icon: Zap, title: 'Generator Backup', img: './images/image4.jpg' },
-              { icon: Droplets, title: 'Hot Water 24/7', img: './images/image7.jpg' },
-              { icon: Bike, title: 'Parking', img: './images/image9.jpg' },
-              { icon: Wind, title: 'RO Water', img: './images/image8.jpg' }
+              { icon: Zap,      title: 'Generator Backup',    img: `${BASE}/images/image4.jpg` },
+              { icon: Droplets, title: 'Hot Water 24/7',      img: `${BASE}/images/image7.jpg` },
+              { icon: Bike,     title: 'Two-Wheeler Parking', img: `${BASE}/images/image9.jpg` },
+              { icon: Wind,     title: 'RO Drinking Water',   img: `${BASE}/images/image8.jpg` },
             ].map((feature, idx) => (
-              <div 
-                key={idx}
-                className="group relative aspect-square rounded-3xl overflow-hidden cursor-pointer"
-              >
-                <img 
-                  src={feature.img} 
-                  alt={feature.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                />
+              <div key={idx} className="group relative aspect-square rounded-3xl overflow-hidden cursor-pointer">
+                <img src={feature.img} alt={`${feature.title} — Best Mansion PG Chennai`}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
                   <feature.icon className="w-8 h-8 mb-3 text-purple-400" />
@@ -378,22 +428,25 @@ export default function BestMansion() {
               </div>
             ))}
           </div>
-
           <div className="relative bg-white bg-opacity-5 backdrop-blur-xl border border-white border-opacity-10 rounded-3xl p-12">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-pink-600/10 rounded-3xl" />
             <div className="relative z-10">
-              <h3 className="text-3xl font-bold mb-12 text-center">Premium Amenities</h3>
+              <h3 className="text-3xl font-bold mb-4 text-center">Premium Amenities at Best Mansion PG, Arumbakkam</h3>
+              <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">All-inclusive paying guest facilities for men in Chennai — no hidden charges.</p>
               <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {[
-                  'A/C Rooms', 'Non-A/C Rooms', 'Attached Bathrooms', 'Premium Mattresses',
-                  'Wardrobes', 'Outdoor Patio', 'Common TV Hall', 'Housekeeping',
-                  '24/7 Security', 'First Aid', 'Fire Safety', 'Laundry Service'
+                  'Free High-Speed WiFi','AC Rooms','Non-AC Rooms','Attached Bathrooms',
+                  'Premium Mattresses','Wardrobes','Outdoor Patio','Common TV Hall',
+                  'Housekeeping','24/7 Security','First Aid Kit','Fire Safety Equipment',
+                  'Laundry Service','RO Drinking Water','Hot Water 24/7','Generator Backup',
                 ].map((amenity, idx) => (
                   <div key={idx} className="flex items-center space-x-3 group cursor-pointer">
                     <div className="w-5 h-5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                       <Check className="w-3 h-3 text-white" />
                     </div>
-                    <span className="text-gray-300 group-hover:text-white transition-colors">{amenity}</span>
+                    <span className={`group-hover:text-white transition-colors ${amenity === 'Free High-Speed WiFi' ? 'text-purple-300 font-semibold' : 'text-gray-300'}`}>
+                      {amenity}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -402,42 +455,30 @@ export default function BestMansion() {
         </div>
       </section>
 
-      {/* Gallery Section */}
+      {/* ── GALLERY ── */}
       <section id="gallery" className="relative py-32 px-6 bg-gradient-to-b from-black to-gray-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <div className="text-sm text-gray-400 tracking-widest uppercase mb-4">Gallery</div>
             <h2 className="text-5xl md:text-6xl font-bold tracking-tight">
-              See For
-              <span className="block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Yourself
-              </span>
+              See Best Mansion
+              <span className="block bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">For Yourself</span>
             </h2>
           </div>
-
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              { src: './images/image1.jpg', title: 'Exterior', span: 'md:col-span-2', style: { aspectRatio: '630/297' } },
-              { src: './images/image3.jpg', title: 'Rooms' },
-              { src: './images/image6.jpg', title: 'Comfort' },
-              { src: './images/image7.jpg', title: 'Hot Water' },
-              { src: './images/image8.jpg', title: 'RO Water' },
-              { src: './images/image4.jpg', title: 'Power Backup' }
+              { src: `${BASE}/images/image1.jpg`, title: 'Exterior — Best Mansion Arumbakkam', span: 'md:col-span-2', style: { aspectRatio: '630/297' } },
+              { src: `${BASE}/images/image3.jpg`, title: 'Sharing Rooms — PG Chennai' },
+              { src: `${BASE}/images/image6.jpg`, title: 'Comfortable PG Accommodation' },
+              { src: `${BASE}/images/image7.jpg`, title: '24/7 Hot Water' },
+              { src: `${BASE}/images/image8.jpg`, title: 'RO Drinking Water' },
+              { src: `${BASE}/images/image4.jpg`, title: 'Generator — Uninterrupted Power' },
             ].map((img, idx) => (
-              <div
-                key={idx}
-                className={`group relative overflow-hidden rounded-2xl ${img.span || 'aspect-square'} cursor-pointer`}
-                style={img.style}
-              >
-                <img
-                  src={img.src}
-                  alt={img.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                />
+              <div key={idx} className={`group relative overflow-hidden rounded-2xl ${img.span || 'aspect-square'} cursor-pointer`} style={img.style}>
+                <img src={img.src} alt={img.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div className="absolute bottom-6 left-6">
-                    <p className="text-2xl font-bold">{img.title}</p>
-                  </div>
+                  <div className="absolute bottom-6 left-6"><p className="text-2xl font-bold">{img.title}</p></div>
                 </div>
               </div>
             ))}
@@ -445,41 +486,44 @@ export default function BestMansion() {
         </div>
       </section>
 
-      {/* Contact Section */}
+      {/* ── CONTACT ── */}
       <section id="contact" className="relative py-32 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <div className="space-y-8">
             <div className="text-sm text-gray-400 tracking-widest uppercase">Get In Touch</div>
             <h2 className="text-5xl md:text-7xl font-bold tracking-tight leading-tight">
-              Your New Home
-              <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Awaits
-              </span>
+              Your New PG Home
+              <span className="block bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">in Chennai Awaits</span>
             </h2>
-            
+            <div className="flex flex-wrap justify-center gap-3 text-sm">
+              {['Free WiFi','AC & Non-AC Rooms','24/7 Hot Water','Generator Backup','RO Water','24/7 Security','Laundry'].map(tag => (
+                <span key={tag} className="bg-white bg-opacity-10 border border-white border-opacity-10 rounded-full px-4 py-1.5 text-gray-300">
+                  {tag === 'Free WiFi' ? <span className="flex items-center gap-1"><Wifi className="w-3 h-3 inline" /> {tag}</span> : tag}
+                </span>
+              ))}
+            </div>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Starting at just ₹3,600/month. Experience affordable and quality lifestyle without the premium price.
+              Best <strong className="text-white">PG accommodation for men in Arumbakkam, Chennai</strong>.
+              Starting at just <strong className="text-white">₹3,600/month</strong>. Affordable sharing rooms
+              near Koyambedu, Anna Nagar, Vadapalani &amp; Aminjikarai.
             </p>
-
             <div className="pt-8 space-y-4">
-              <a
-                href="https://wa.me/+919381019882?text=Hi, I'm interested in finding a room at Best Mansion. Could you please provide more information?"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block group relative px-12 py-5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full font-semibold text-lg overflow-hidden transition-all hover:scale-105"
-              >
+              <a href="https://wa.me/+919381019882?text=Hi, I'm interested in finding a room at Best Mansion. Could you please provide more information?"
+                target="_blank" rel="noopener noreferrer"
+                className="inline-block group relative px-12 py-5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full font-semibold text-lg overflow-hidden transition-all hover:scale-105">
                 <span className="relative z-10">Connect on WhatsApp</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-pink-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </a>
-
               <div className="text-gray-400 space-y-2">
                 <p className="flex items-center justify-center space-x-2">
                   <Phone className="w-4 h-4" />
-                  <span>93810 19882 / 90258 12030</span>
+                  <a href="tel:+919381019882" className="hover:text-white transition-colors">93810 19882</a>
+                  <span>/</span>
+                  <a href="tel:+919025812030" className="hover:text-white transition-colors">90258 12030</a>
                 </p>
                 <p className="flex items-center justify-center space-x-2">
                   <MapPin className="w-4 h-4" />
-                  <span>Anna Avenue, Arumbakkam, Chennai 600 106</span>
+                  <span>21-A, Anna Avenue, Arumbakkam, Chennai – 600 106</span>
                 </p>
               </div>
             </div>
@@ -489,10 +533,14 @@ export default function BestMansion() {
 
       {/* Footer */}
       <footer className="border-t border-white border-opacity-10 py-12 px-6">
-        <div className="max-w-7xl mx-auto text-center text-gray-500">
-          <p>© 2024 Best Mansion. Exclusively for Men. All rights reserved.</p>
+        <div className="max-w-7xl mx-auto text-center text-gray-500 space-y-2">
+          <p>© 2026 Best Mansion — Best PG &amp; Paying Guest Accommodation for Men in Arumbakkam, Chennai.</p>
+          <p className="text-xs text-gray-600">
+            Free WiFi · AC Rooms · Serving men looking for PG in Anna Nagar · Arumbakkam · Koyambedu · Vadapalani · Aminjikarai · Chennai.
+          </p>
         </div>
       </footer>
+
     </div>
   );
 }
